@@ -37,7 +37,8 @@ public final class ErroriConstants {
     public static final String ERR34 = "ERR34";
     public static final String ERR35 = "ERR35";
     public static final String ERR36 = "ERR36";
-    public static final String ERR37 = "ERR38";
+    public static final String ERR37 = "ERR37";
+    public static final String ERR38 = "ERR38";
     public static final String ERR39 = "ERR39";
     public static final String ERR40 = "ERR40";
     public static final String ERR41 = "ERR41";
