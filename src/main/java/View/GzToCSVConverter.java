@@ -13,7 +13,7 @@ public class GzToCSVConverter {
             processGzFile(gzFilePath);
         }*/
         String inputFolderPath = "C:\\Users\\a.garofalo\\Documents\\LogFolder\\npaintegration.log.2024-01-16.gz";
-        String outputFilePath = "C:\\Users\\a.garofalo\\Documents\\npaintegration.log.csv";
+        String outputFilePath = "C:\\Users\\a.garofalo\\Documents\\npaintegration.log.2024-01-16.StatusCode400.401.csv";
         Converter converter = new Converter();
         converter.createCSVFile(inputFolderPath,outputFilePath);
     }
