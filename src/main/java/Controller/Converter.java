@@ -6,37 +6,31 @@ import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
+import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.Map;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.zip.GZIPInputStream;
 
 public class Converter {
     Map<String,Integer> mapErrors400 = new HashMap<String,Integer>();
-    Map<String,Integer> mapErrors401 = new HashMap<String,Integer>();
-    public void createCSVFile(String inputFile,String outputFile){
+
+    public void createCSVFile(String inputFile, String outputFile) {
         try {
-            // Apri il file gz in input
             FileInputStream fileInputStream = new FileInputStream(inputFile);
             GZIPInputStream gzipInputStream = new GZIPInputStream(fileInputStream);
             InputStreamReader inputStreamReader = new InputStreamReader(gzipInputStream, StandardCharsets.UTF_8);
             BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
             String line;
             while ((line = bufferedReader.readLine()) != null) {
-                // Elabora la riga e trasformala in formato csv
                 String[] arrays = splitLine(line);
                 String csvLine = createCSVLine(arrays);
-                // Verifica se la riga contiene la stringa indicata
-             if (csvLine.contains("StatusCode =  - 400")) {
-                 processCsvLine400(csvLine, mapErrors400);
-                }
-             else if (csvLine.contains("StatusCode =  - 401")){
-                 processCsvLine401(csvLine, mapErrors401);
-                }
+                if (csvLine.contains("StatusCode =  - 400")) {
+                    processCsvLine400(csvLine, mapErrors400);}
             }
-            // Chiudi tutti i file
             bufferedReader.close();
             createCsv400(mapErrors400, outputFile);
-            createCsv401(mapErrors401, outputFile);
             System.out.println("Conversione completata.");
         } catch (IOException e) {
             e.printStackTrace();
@@ -49,7 +43,7 @@ public class Converter {
         if (mapErrors400!=null){
             try {
                 bufferedWriter.append("StatusCode - 400").append("\n");
-                bufferedWriter.append("ErrorsCode,Occurrence").append("\n");
+                bufferedWriter.append("ErrorsCode,Occurrence,Day").append("\n");
                 for (Map.Entry<String,Integer> entry : mapErrors400.entrySet()){
                     bufferedWriter.append(entry.getKey()).append(",").append(String.valueOf(entry.getValue())).append("\n");
                 }
@@ -60,37 +54,17 @@ public class Converter {
         }
     }
 
-    private void createCsv401(Map<String, Integer> mapErrors401, String outputFile) throws IOException {
-        FileWriter fileWriter = new FileWriter(outputFile, true); // Imposta il flag "true" per appendere al file
-        BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
-        if (mapErrors401 != null) {
-            try {
-                bufferedWriter.append("\n");
-                bufferedWriter.append("StatusCode - 401").append("\n");
-                bufferedWriter.append("Detail,Occurrence").append("\n");
-                for (Map.Entry<String, Integer> entry : mapErrors401.entrySet()) {
-                    bufferedWriter.append(entry.getKey()).append(",").append(String.valueOf(entry.getValue())).append("\n");
-                }
-                bufferedWriter.close();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
     private static String[] splitLine(String line) {
         return line.split(",");
-        // Restituisce un array di tipo Stringhe contenente i segmenti separati della riga.
     }
 
     private static String createCSVLine(String[] splits){
-        // Trasforma i dati nella riga nel formato desiderato per il file csv
         StringBuilder csvLineBuilder = new StringBuilder();
         for (String split : splits) {
             csvLineBuilder.append(split.trim());
             csvLineBuilder.append(",");
         }
-        csvLineBuilder.setLength(csvLineBuilder.length() - 1); // Rimuovi l'ultima virgola
+        csvLineBuilder.setLength(csvLineBuilder.length() - 1);
         return csvLineBuilder.toString();
     }
 
@@ -112,44 +86,25 @@ public class Converter {
                         e.printStackTrace();
                     }
                 }
-            }
-    }
-
-    public void processCsvLine401(String csvLine, Map<String, Integer> mapErrors401) {
-            // Estrai il contenuto del campo "detail"
-            String detail = "";
-            String[] csvArray = csvLine.split(",");
-            for (int i = 0; i < csvArray.length - 1; i++) {
-                if (csvArray[i].trim().equals("\"detail\"")) {
-                    detail = csvArray[i + 1].trim().replace("\"", "");
-                    break;
-                }
-            }
-            // Aggiorna la mappa con l'occorrenza corrispondente
-            if (!detail.isEmpty()) {
-                if (mapErrors401.containsKey(detail)) {
-                    Integer count = mapErrors401.get(detail);
-                    count = count + 1;
-                    mapErrors401.put(detail, count);
-                } else {
-                    mapErrors401.put(detail, 1);
-                }
-            }
-    }
-
-   /* public void readJson(){
-        try {
-            // Percorso del file JSON
-            Path filePath = Paths.get("C:\\Users\\a.garofalo\\Accenture\\Java\\GzToCSVConverter\\src\\main\\resources\\errori.json");
-
-            // Leggi tutte le righe dal file
-            List<String> lines = Files.readAllLines(filePath);
-
-            // Unisci le righe in una singola stringa
-            String jsonContent = String.join("", lines);
-              System.out.println(jsonContent);
-        } catch (Exception e) {
-            e.printStackTrace();
         }
-    }*/
+    }
+
+    private LocalDateTime getDateTime(String dateString) {
+        try {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss,SSS ");
+            return LocalDateTime.parse(dateString, formatter);
+        } catch (DateTimeParseException e) {
+            e.printStackTrace();
+            return LocalDateTime.now();
+        }
+    }
+
+    private String formatDateTime(LocalDateTime dateTime) {
+        if (dateTime != null) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss,SSS ");
+            return dateTime.format(formatter);
+        } else {
+            return "";
+        }
+    }
 }
