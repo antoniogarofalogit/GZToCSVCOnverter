@@ -41,17 +41,17 @@ public class Converter {
         FileWriter fileWriter = new FileWriter(outputFile);
         BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
         bufferedWriter.append("StatusCode").append(";").append("Day").append(";").append("ErrorsCode").append(";").append("Occurence").append("\n");
-        try{
-        for (Map.Entry<String, Map<String, Integer>> dateEntry : mapErrorsByDate.entrySet()) {
-            String day = dateEntry.getKey();
-            Map<String, Integer> errors = dateEntry.getValue();
-            for (Map.Entry<String, Integer> errorEntry : errors.entrySet()) {
-                String errorCode = errorEntry.getKey();
-                Integer occurrence = errorEntry.getValue();
-                bufferedWriter.append("400").append(";").append(day).append(";").append(errorCode).append(";").append(String.valueOf(occurrence)).append("\n");
+        try {
+            for (Map.Entry<String, Map<String, Integer>> dateEntry : mapErrorsByDate.entrySet()) {
+                String day = dateEntry.getKey();
+                Map<String, Integer> errors = dateEntry.getValue();
+                for (Map.Entry<String, Integer> errorEntry : errors.entrySet()) {
+                    String errorCode = errorEntry.getKey();
+                    Integer occurrence = errorEntry.getValue();
+                    bufferedWriter.append("400").append(";").append(day).append(";").append(errorCode).append(";").append(String.valueOf(occurrence)).append("\n");
+                }
             }
-        }
-        }catch (Exception e){
+        } catch (Exception e) {
             logger(e);
         }
         bufferedWriter.close();

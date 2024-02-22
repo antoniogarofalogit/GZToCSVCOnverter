@@ -12,7 +12,7 @@ public class GzToCSVConverter {
         GzFiles gzFiles = new GzFiles();
         List<String> inputFilePaths = gzFiles.getAllGzFiles(inputFolderPath);
         Converter converter = new Converter();
-        converter.createCSVFile(inputFilePaths,outputFilePath);
+        converter.createCSVFile(inputFilePaths, outputFilePath);
         ConverterDetails converterDetails = new ConverterDetails();
         converterDetails.createCSVFile(inputFilePaths, outputFilePathDetails);
     }

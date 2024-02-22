@@ -1,7 +1,9 @@
 package Model;
 
 public final class ErroriConstants {
-    private ErroriConstants(){}
+    private ErroriConstants() {
+    }
+
     public static final String ERR1 = "ERR1";
     public static final String ERR2 = "ERR2";
     public static final String ERR3 = "ERR3";
