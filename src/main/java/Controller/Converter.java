@@ -1,8 +1,19 @@
 package Controller;
 
 import Model.ErroriConstants;
+import com.sun.javafx.scene.control.skin.ColorPalette;
 import org.apache.log4j.Logger;
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.axis.NumberAxis;
+import org.jfree.chart.plot.CategoryPlot;
+import org.jfree.chart.plot.PlotOrientation;
+import org.jfree.chart.renderer.category.BarRenderer;
+import org.jfree.chart.renderer.category.StandardBarPainter;
+import org.jfree.data.category.DefaultCategoryDataset;
 
+import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -10,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.List;
 import java.util.zip.GZIPInputStream;
 
 public class Converter {
@@ -75,6 +87,84 @@ public class Converter {
         } catch (ParseException | IllegalAccessException e) {
             logger(e);
             throw new RuntimeException(e);
+        }
+    }
+
+    public Map<String, Integer> extractERROccurrences(List<String> inputFilePaths, String startDate, String endDate) {
+        Map<String, Integer> errOccurrences = new LinkedHashMap<>();
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+        try {
+            Date start = dateFormat.parse(startDate);
+            Date end = dateFormat.parse(endDate);
+            for (String filePath : inputFilePaths) {
+                FileInputStream fileInputStream = new FileInputStream(filePath);
+                GZIPInputStream gzipInputStream = new GZIPInputStream(fileInputStream);
+                InputStreamReader inputStreamReader = new InputStreamReader(gzipInputStream, StandardCharsets.UTF_8);
+                BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
+                String line;
+                while ((line = bufferedReader.readLine()) != null) {
+                    if (line.matches(".*\\bERR15\\b.*")) {
+                        String day = extractDateFromLogLine(line);
+                        if (day != null) {
+                            errOccurrences.put(day, errOccurrences.getOrDefault(day, 0) + 1);
+                        }
+                    }
+                }
+                bufferedReader.close();
+            }
+        } catch (IOException | ParseException e) {
+            logger(e);
+        }
+        return errOccurrences;
+    }
+
+    private String extractDateFromLogLine(String logLine) {
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+        try {
+            String dateString = logLine.substring(0, 10);
+            return dateFormat.format(dateFormat.parse(dateString));
+        } catch (ParseException | StringIndexOutOfBoundsException e) {
+            logger(e);
+            return null;
+        }
+    }
+
+    public void createIstogram(Map<String, Integer> err4Occurrences, String startDate, String endDate, String outputHistogramFilePath) {
+        DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        try {
+            Date start = sdf.parse(startDate);
+            Date end = sdf.parse(endDate);
+            for (Date date = start; date.compareTo(end) <= 0; date.setTime(date.getTime() + 86400000)) {
+                String day = sdf.format(date);
+                int occurrences = err4Occurrences.getOrDefault(day, 0);
+                dataset.addValue(occurrences, "ERR15", day);
+            }
+        } catch (Exception e) {
+            logger(e);
+        }
+        JFreeChart chart = ChartFactory.createBarChart(
+                "ERR15 Occurrences",
+                "Day",
+                "Occurrences",
+                dataset,
+                PlotOrientation.VERTICAL,
+                false,
+                false,
+                false);
+        CategoryPlot plot = chart.getCategoryPlot();
+        plot.setBackgroundPaint(Color.WHITE);
+        BarRenderer renderer = (BarRenderer) plot.getRenderer();
+        renderer.setBarPainter(new StandardBarPainter());
+        renderer.setSeriesPaint(0, Color.BLACK);
+        NumberAxis yAxis = (NumberAxis) chart.getCategoryPlot().getRangeAxis();
+        yAxis.setStandardTickUnits(NumberAxis.createIntegerTickUnits());
+        BufferedImage image = chart.createBufferedImage(800, 600);
+        try {
+            File outputfile = new File(outputHistogramFilePath);
+            javax.imageio.ImageIO.write(image, "jpeg", outputfile);
+        } catch (IOException e) {
+            logger(e);
         }
     }
 
