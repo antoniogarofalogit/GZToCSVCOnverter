@@ -1,8 +1,13 @@
 package Controller;
 
 import Model.ErroriConstants;
-import com.sun.javafx.scene.control.skin.ColorPalette;
+
 import org.apache.log4j.Logger;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.NumberAxis;
@@ -12,6 +17,7 @@ import org.jfree.chart.renderer.category.BarRenderer;
 import org.jfree.chart.renderer.category.StandardBarPainter;
 import org.jfree.data.category.DefaultCategoryDataset;
 
+import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
@@ -90,7 +96,7 @@ public class Converter {
         }
     }
 
-    public Map<String, Integer> extractERROccurrences(List<String> inputFilePaths, String startDate, String endDate) {
+    public Map<String, Integer> extractERROccurrences(List<String> inputFilePaths, String startDate, String endDate, String errorCode) {
         Map<String, Integer> errOccurrences = new LinkedHashMap<>();
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
         try {
@@ -103,7 +109,7 @@ public class Converter {
                 BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
                 String line;
                 while ((line = bufferedReader.readLine()) != null) {
-                    if (line.matches(".*\\bERR15\\b.*")) {
+                    if (line.matches(".*\\b" + errorCode + "\\b.*") && line.contains("StatusCode =  - 400")) {
                         String day = extractDateFromLogLine(line);
                         if (day != null) {
                             errOccurrences.put(day, errOccurrences.getOrDefault(day, 0) + 1);
@@ -129,7 +135,7 @@ public class Converter {
         }
     }
 
-    public void createIstogram(Map<String, Integer> err4Occurrences, String startDate, String endDate, String outputHistogramFilePath) {
+    private static void createHistogramAndAddToPDF(PDDocument document, Map<String, Integer> errOccurrences, String errorCode, String startDate, String endDate) throws IOException {
         DefaultCategoryDataset dataset = new DefaultCategoryDataset();
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
         try {
@@ -137,14 +143,15 @@ public class Converter {
             Date end = sdf.parse(endDate);
             for (Date date = start; date.compareTo(end) <= 0; date.setTime(date.getTime() + 86400000)) {
                 String day = sdf.format(date);
-                int occurrences = err4Occurrences.getOrDefault(day, 0);
-                dataset.addValue(occurrences, "ERR15", day);
+                int occurrences = errOccurrences.getOrDefault(day, 0);
+                dataset.addValue(occurrences, errorCode, day);
             }
         } catch (Exception e) {
             logger(e);
         }
+
         JFreeChart chart = ChartFactory.createBarChart(
-                "ERR15 Occurrences",
+                errorCode + " Occurrences",
                 "Day",
                 "Occurrences",
                 dataset,
@@ -152,6 +159,7 @@ public class Converter {
                 false,
                 false,
                 false);
+
         CategoryPlot plot = chart.getCategoryPlot();
         plot.setBackgroundPaint(Color.WHITE);
         BarRenderer renderer = (BarRenderer) plot.getRenderer();
@@ -159,16 +167,38 @@ public class Converter {
         renderer.setSeriesPaint(0, Color.BLACK);
         NumberAxis yAxis = (NumberAxis) chart.getCategoryPlot().getRangeAxis();
         yAxis.setStandardTickUnits(NumberAxis.createIntegerTickUnits());
+
         BufferedImage image = chart.createBufferedImage(800, 600);
-        try {
-            File outputfile = new File(outputHistogramFilePath);
-            javax.imageio.ImageIO.write(image, "jpeg", outputfile);
+        PDPage page = new PDPage(PDRectangle.A4);
+        document.addPage(page);
+        try (PDPageContentStream contentStream = new PDPageContentStream(document, page, PDPageContentStream.AppendMode.APPEND, true)) {
+            contentStream.drawImage(PDImageXObject.createFromByteArray(document, toByteArray(image), ""), 50, 300, 500, 400);
+        }
+    }
+
+    private static byte[] toByteArray(BufferedImage image) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", baos);
+        return baos.toByteArray();
+    }
+
+    public void createPDF(String inputFolderPath, String pdfFilePath, String startDate, String endDate) {
+        try (PDDocument document = new PDDocument()) {
+            GzFiles gzFiles = new GzFiles();
+            for (String errorCode : ErroriConstants.getAllErrorCodes()) {
+                Map<String, Integer> errOccurrences = extractERROccurrences(gzFiles.getAllGzFiles(inputFolderPath), startDate, endDate, errorCode);
+                if (!errOccurrences.isEmpty()) {
+                    createHistogramAndAddToPDF(document, errOccurrences, errorCode, startDate, endDate);
+                }
+            }
+            document.save(pdfFilePath);
+            System.out.println("PDF creato con successo: " + pdfFilePath);
         } catch (IOException e) {
             logger(e);
         }
     }
 
-    private void logger(Exception e) {
+    private static void logger(Exception e) {
         LOGGER.error(e.getMessage());
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug(e.getMessage(), e);
