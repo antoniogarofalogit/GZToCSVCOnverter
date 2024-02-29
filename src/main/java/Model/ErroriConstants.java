@@ -1,9 +1,5 @@
 package Model;
 
-import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.List;
-
 public final class ErroriConstants {
     private ErroriConstants() {
     }
@@ -295,18 +291,4 @@ public final class ErroriConstants {
     public static final String SEC14 = "SEC14";
     public static final String SEC15 = "SEC15";
 
-    public static List<String> getAllErrorCodes() {
-        List<String> errorCodes = new ArrayList<>();
-        Field[] fields = ErroriConstants.class.getDeclaredFields();
-        for (Field field : fields) {
-            if (field.getType() == String.class) {
-                try {
-                    errorCodes.add((String) field.get(null));
-                } catch (IllegalAccessException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-        return errorCodes;
-    }
 }

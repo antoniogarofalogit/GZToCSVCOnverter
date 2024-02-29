@@ -2,11 +2,17 @@ package Controller;
 
 import Model.ErroriConstants;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Logger;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.JFreeChart;
@@ -171,9 +177,40 @@ public class Converter {
         BufferedImage image = chart.createBufferedImage(800, 600);
         PDPage page = new PDPage(PDRectangle.A4);
         document.addPage(page);
+
         try (PDPageContentStream contentStream = new PDPageContentStream(document, page, PDPageContentStream.AppendMode.APPEND, true)) {
+            String description = getDescriptionFromErrorCode(errorCode);
+            contentStream.setFont(PDType1Font.HELVETICA, 12);
+            contentStream.beginText();
+            contentStream.newLineAtOffset(50, 750);
+            contentStream.showText(errorCode + ": " + description);
+            contentStream.endText();
             contentStream.drawImage(PDImageXObject.createFromByteArray(document, toByteArray(image), ""), 50, 300, 500, 400);
         }
+    }
+
+    private static String getDescriptionFromErrorCode(String errorCode) {
+        try {
+            String errorJsonFilePath = "C:\\Users\\a.garofalo\\Accenture\\Java\\GzToCSVConverter\\src\\main\\resources\\errori.json";
+            JsonElement jsonElement = new Gson().fromJson(new FileReader(errorJsonFilePath), JsonElement.class);
+            if (jsonElement.isJsonArray()) {
+                JsonArray jsonArray = jsonElement.getAsJsonArray();
+                for (JsonElement element : jsonArray) {
+                    JsonObject errorObject = element.getAsJsonObject();
+                    if (errorObject.has("codice") && errorObject.get("codice").getAsString().equals(errorCode)) {
+                        JsonObject descriptionObject = errorObject.getAsJsonObject("descrizione");
+                        if (descriptionObject.has("it")) {
+                            return descriptionObject.get("it").getAsString();
+                        } else {
+                            return StringUtils.EMPTY;
+                        }
+                    }
+                }
+            }
+        } catch (IOException e) {
+            logger(e);
+        }
+        return StringUtils.EMPTY;
     }
 
     private static byte[] toByteArray(BufferedImage image) throws IOException {
@@ -185,17 +222,32 @@ public class Converter {
     public void createPDF(String inputFolderPath, String pdfFilePath, String startDate, String endDate) {
         try (PDDocument document = new PDDocument()) {
             GzFiles gzFiles = new GzFiles();
-            for (String errorCode : ErroriConstants.getAllErrorCodes()) {
+            for (String errorCode : getAllErrorCodes()) {
                 Map<String, Integer> errOccurrences = extractERROccurrences(gzFiles.getAllGzFiles(inputFolderPath), startDate, endDate, errorCode);
                 if (!errOccurrences.isEmpty()) {
                     createHistogramAndAddToPDF(document, errOccurrences, errorCode, startDate, endDate);
                 }
             }
             document.save(pdfFilePath);
-            System.out.println("PDF creato con successo: " + pdfFilePath);
+            System.out.println("PDF creato con successo!");
         } catch (IOException e) {
             logger(e);
         }
+    }
+
+    private static List<String> getAllErrorCodes() {
+        List<String> errorCodes = new ArrayList<>();
+        Field[] fields = ErroriConstants.class.getDeclaredFields();
+        for (Field field : fields) {
+            if (field.getType() == String.class) {
+                try {
+                    errorCodes.add((String) field.get(null));
+                } catch (IllegalAccessException e) {
+                    logger(e);
+                }
+            }
+        }
+        return errorCodes;
     }
 
     private static void logger(Exception e) {
