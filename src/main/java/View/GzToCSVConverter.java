@@ -11,13 +11,14 @@ public class GzToCSVConverter {
         String outputFilePathDetails = "C:\\Users\\a.garofalo\\Documents\\DetailsErrors.csv";
         GzFiles gzFiles = new GzFiles();
         List<String> inputFilePaths = gzFiles.getAllGzFiles(inputFolderPath);
-        Converter converter = new Converter();
-        converter.createCSVFile(inputFilePaths, outputFilePath);
-        ConverterDetails converterDetails = new ConverterDetails();
-        converterDetails.createCSVFile(inputFilePaths, outputFilePathDetails);
+        ConverterOccurenceCSV converterOccurenceCSV = new ConverterOccurenceCSV();
+        converterOccurenceCSV.createCSVFile(inputFilePaths, outputFilePath);
+       ConverterDetailsCSV converterDetailsCSV = new ConverterDetailsCSV();
+        converterDetailsCSV.createCSVFileDetails(inputFilePaths, outputFilePathDetails);
+       /* ConverterPDF converterPDF = new ConverterPDF();
         String startDate = "2024-02-21";
         String endDate = "2024-02-26";
         String pdfFilePath = "C:\\Users\\a.garofalo\\Documents\\ErrorHistograms.pdf";
-        converter.createPDF(inputFolderPath, pdfFilePath, startDate, endDate);
+        converterPDF.createPDF(inputFolderPath, pdfFilePath, startDate, endDate);*/
     }
 }

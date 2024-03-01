@@ -17,11 +17,11 @@ import java.util.zip.GZIPInputStream;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 
-public class ConverterDetails {
-    private static final Logger LOGGER = Logger.getLogger(ConverterDetails.class);
+public class ConverterDetailsCSV {
+    private static final Logger LOGGER = Logger.getLogger(ConverterDetailsCSV.class);
     List<String> listaResponse = new ArrayList<>();
 
-    public void createCSVFile(List<String> inputFilePath, String outputFile) {
+    public void createCSVFileDetails(List<String> inputFilePath, String outputFile) {
         for (String inputFile : inputFilePath) {
             try {
                 FileInputStream fileInputStream = new FileInputStream(inputFile);
@@ -30,7 +30,7 @@ public class ConverterDetails {
                 BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
                 String line;
                 while ((line = bufferedReader.readLine()) != null) {
-                    if (line.contains("StatusCode =  - 400") || line.contains("StatusCode =  - 401")) {
+                    if (line.contains("StatusCode =  - 400")) {
                         processCsvLine(line, outputFile);
                     }
                 }
