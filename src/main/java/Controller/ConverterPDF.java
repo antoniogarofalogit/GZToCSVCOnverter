@@ -36,13 +36,13 @@ import java.util.zip.GZIPInputStream;
 
 public class ConverterPDF {
     private static final Logger LOGGER = Logger.getLogger(ConverterPDF.class);
+    private static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
 
     public Map<String, Integer> extractERROccurrences(List<String> inputFilePaths, String startDate, String endDate, String errorCode) {
         Map<String, Integer> errOccurrences = new LinkedHashMap<>();
-        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
         try {
-            Date start = dateFormat.parse(startDate);
-            Date end = dateFormat.parse(endDate);
+            Date start = sdf.parse(startDate);
+            Date end = sdf.parse(endDate);
             for (String filePath : inputFilePaths) {
                 FileInputStream fileInputStream = new FileInputStream(filePath);
                 GZIPInputStream gzipInputStream = new GZIPInputStream(fileInputStream);
@@ -66,10 +66,9 @@ public class ConverterPDF {
     }
 
     private String extractDateFromLogLine(String logLine) {
-        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
         try {
             String dateString = logLine.substring(0, 10);
-            return dateFormat.format(dateFormat.parse(dateString));
+            return sdf.format(sdf.parse(dateString));
         } catch (ParseException | StringIndexOutOfBoundsException e) {
             logger(e);
             return null;
@@ -78,7 +77,6 @@ public class ConverterPDF {
 
     private static void createHistogramAndAddToPDF(PDDocument document, Map<String, Integer> errOccurrences, String errorCode, String startDate, String endDate) throws IOException {
         DefaultCategoryDataset dataset = new DefaultCategoryDataset();
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
         try {
             Date start = sdf.parse(startDate);
             Date end = sdf.parse(endDate);
@@ -105,7 +103,7 @@ public class ConverterPDF {
         plot.setBackgroundPaint(Color.WHITE);
         BarRenderer renderer = (BarRenderer) plot.getRenderer();
         renderer.setBarPainter(new StandardBarPainter());
-        renderer.setSeriesPaint(0, Color.BLACK);
+        renderer.setSeriesPaint(0, new Color(138, 43, 226));
         NumberAxis yAxis = (NumberAxis) chart.getCategoryPlot().getRangeAxis();
         yAxis.setStandardTickUnits(NumberAxis.createIntegerTickUnits());
 
@@ -157,12 +155,14 @@ public class ConverterPDF {
     public void createPDF(String inputFolderPath, String pdfFilePath, String startDate, String endDate) {
         try (PDDocument document = new PDDocument()) {
             GzFiles gzFiles = new GzFiles();
+            Map<String, Map<String, Integer>> allErrorOccurrences = extractAllErrorOccurrences(gzFiles.getAllGzFiles(inputFolderPath), startDate, endDate);
             for (String errorCode : getAllErrorCodes()) {
-                Map<String, Integer> errOccurrences = extractERROccurrences(gzFiles.getAllGzFiles(inputFolderPath), startDate, endDate, errorCode);
+                Map<String, Integer> errOccurrences = allErrorOccurrences.getOrDefault(errorCode, Collections.emptyMap());
                 if (!errOccurrences.isEmpty()) {
                     createHistogramAndAddToPDF(document, errOccurrences, errorCode, startDate, endDate);
                 }
             }
+            addTableToPDF(document, allErrorOccurrences, startDate, endDate);
             document.save(pdfFilePath);
             System.out.println("PDF creato con successo!");
         } catch (IOException e) {
@@ -170,7 +170,103 @@ public class ConverterPDF {
         }
     }
 
-    private static List<String> getAllErrorCodes() {
+    private Map<String, Map<String, Integer>> extractAllErrorOccurrences(List<String> inputFilePaths, String startDate, String endDate) {
+        Map<String, Map<String, Integer>> allErrorOccurrences = new LinkedHashMap<>();
+        for (String errorCode : getAllErrorCodes()) {
+            Map<String, Integer> errOccurrences = extractERROccurrences(inputFilePaths, startDate, endDate, errorCode);
+            allErrorOccurrences.put(errorCode, errOccurrences);
+        }
+        return allErrorOccurrences;
+    }
+
+    private void addTableToPDF(PDDocument document, Map<String, Map<String, Integer>> allErrorOccurrences, String startDate, String endDate) throws IOException {
+        int cellWidth = 75;
+        int cellHeight = 20;
+        int x = 50;
+        int y = 750;
+
+        PDPage page = new PDPage(PDRectangle.A4);
+        document.addPage(page);
+
+        try (PDPageContentStream contentStream = new PDPageContentStream(document, page, PDPageContentStream.AppendMode.APPEND, true)) {
+            contentStream.setFont(PDType1Font.HELVETICA_BOLD, 12);
+            drawCell(contentStream, x, y, cellWidth, cellHeight, "ErrorCodes", true);
+            for (Date date = sdf.parse(startDate); date.compareTo(sdf.parse(endDate)) <= 0; date.setTime(date.getTime() + 86400000)) {
+                String day = sdf.format(date);
+                drawCell(contentStream, x + cellWidth, y, cellWidth, cellHeight, day, true);
+                x += cellWidth;
+            }
+            x = 50;
+            y -= cellHeight;
+
+            List<String> errorCodes = getAllErrorCodes();
+
+            for (String errorCode : errorCodes) {
+                Map<String, Integer> errOccurrences = allErrorOccurrences.getOrDefault(errorCode, Collections.emptyMap());
+
+                boolean hasOccurrences = errOccurrences.entrySet().stream()
+                        .anyMatch(entry -> {
+                            try {
+                                Date date = sdf.parse(entry.getKey());
+                                return date.compareTo(sdf.parse(startDate)) >= 0 && date.compareTo(sdf.parse(endDate)) <= 0 && entry.getValue() > 0;
+                            } catch (ParseException e) {
+                                logger(e);
+                                return false;
+                            }
+                        });
+
+                if (hasOccurrences) {
+                    drawCell(contentStream, x, y, cellWidth, cellHeight, errorCode, true);
+
+                    for (Date date = sdf.parse(startDate); date.compareTo(sdf.parse(endDate)) <= 0; date.setTime(date.getTime() + 86400000)) {
+                        String day = sdf.format(date);
+                        int occurrences = errOccurrences.getOrDefault(day, 0);
+                        drawCell(contentStream, x + cellWidth, y, cellWidth, cellHeight, String.valueOf(occurrences), false);
+                        x += cellWidth;
+                    }
+                    x = 50;
+                    y -= cellHeight;
+                }
+            }
+        } catch (IOException | ParseException e) {
+            logger(e);
+        }
+    }
+
+    private void drawCell(PDPageContentStream contentStream, int x, int y, int width, int height, String text, boolean isHeader) throws IOException {
+        contentStream.setStrokingColor(Color.BLACK);
+        contentStream.setLineWidth(0.5f);
+        contentStream.moveTo(x, y);
+        contentStream.lineTo(x + width, y);
+        contentStream.stroke();
+
+        contentStream.moveTo(x, y - height);
+        contentStream.lineTo(x + width, y - height);
+        contentStream.stroke();
+
+        contentStream.moveTo(x, y);
+        contentStream.lineTo(x, y - height);
+        contentStream.stroke();
+
+        contentStream.moveTo(x + width, y);
+        contentStream.lineTo(x + width, y - height);
+        contentStream.stroke();
+
+        contentStream.setFont(PDType1Font.HELVETICA_BOLD, 12);
+
+        String[] textLines = StringUtils.splitByWholeSeparatorPreserveAllTokens(text, " ");
+        float lineHeight = PDType1Font.HELVETICA_BOLD.getFontDescriptor().getFontBoundingBox().getHeight() / 1000 * 12;
+        float textY = y - (height / 2f) - (lineHeight * textLines.length / 2f);
+        for (String line : textLines) {
+            contentStream.beginText();
+            contentStream.newLineAtOffset(x + (width / 2f) - (line.length() * 3), textY);
+            contentStream.showText(line);
+            contentStream.endText();
+            textY += lineHeight;
+        }
+    }
+
+    private List<String> getAllErrorCodes() {
         List<String> errorCodes = new ArrayList<>();
         Field[] fields = ErroriConstants.class.getDeclaredFields();
         for (Field field : fields) {
