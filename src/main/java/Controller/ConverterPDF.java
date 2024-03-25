@@ -180,7 +180,7 @@ public class ConverterPDF {
     }
 
     private void addTableToPDF(PDDocument document, Map<String, Map<String, Integer>> allErrorOccurrences, String startDate, String endDate) throws IOException {
-        int cellWidth = 75;
+        int cellWidth = 63;
         int cellHeight = 20;
         int x = 50;
         int y = 750;
@@ -190,17 +190,19 @@ public class ConverterPDF {
 
         try (PDPageContentStream contentStream = new PDPageContentStream(document, page, PDPageContentStream.AppendMode.APPEND, true)) {
             contentStream.setFont(PDType1Font.HELVETICA_BOLD, 12);
-            drawCell(contentStream, x, y, cellWidth, cellHeight, "ErrorCodes", true);
+            drawCell(contentStream, x, y, cellWidth, cellHeight, "Errori", true);
             for (Date date = sdf.parse(startDate); date.compareTo(sdf.parse(endDate)) <= 0; date.setTime(date.getTime() + 86400000)) {
                 String day = sdf.format(date);
                 drawCell(contentStream, x + cellWidth, y, cellWidth, cellHeight, day, true);
                 x += cellWidth;
             }
+            drawCell(contentStream, x + cellWidth, y, cellWidth, cellHeight, "Totale", true);
             x = 50;
             y -= cellHeight;
 
             List<String> errorCodes = getAllErrorCodes();
 
+            Map<String, Integer> totalRow = new HashMap<>();
             for (String errorCode : errorCodes) {
                 Map<String, Integer> errOccurrences = allErrorOccurrences.getOrDefault(errorCode, Collections.emptyMap());
 
@@ -218,16 +220,29 @@ public class ConverterPDF {
                 if (hasOccurrences) {
                     drawCell(contentStream, x, y, cellWidth, cellHeight, errorCode, true);
 
+                    int rowTotal = 0;
                     for (Date date = sdf.parse(startDate); date.compareTo(sdf.parse(endDate)) <= 0; date.setTime(date.getTime() + 86400000)) {
                         String day = sdf.format(date);
                         int occurrences = errOccurrences.getOrDefault(day, 0);
+                        rowTotal += occurrences;
                         drawCell(contentStream, x + cellWidth, y, cellWidth, cellHeight, String.valueOf(occurrences), false);
                         x += cellWidth;
+                        totalRow.put(day, totalRow.getOrDefault(day, 0) + occurrences);
                     }
+                    drawCell(contentStream, x + cellWidth, y, cellWidth, cellHeight, String.valueOf(rowTotal), false);
+                    totalRow.put("Totale", totalRow.getOrDefault("Totale", 0) + rowTotal);
+
                     x = 50;
                     y -= cellHeight;
                 }
             }
+            drawCell(contentStream, x, y, cellWidth, cellHeight, "Totale", true);
+            for (Date date = sdf.parse(startDate); date.compareTo(sdf.parse(endDate)) <= 0; date.setTime(date.getTime() + 86400000)) {
+                String day = sdf.format(date);
+                drawCell(contentStream, x + cellWidth, y, cellWidth, cellHeight, String.valueOf(totalRow.getOrDefault(day, 0)), false);
+                x += cellWidth;
+            }
+            drawCell(contentStream, x + cellWidth, y, cellWidth, cellHeight, String.valueOf(totalRow.getOrDefault("Totale", 0)), false);
         } catch (IOException | ParseException e) {
             logger(e);
         }
